@@ -1,0 +1,116 @@
+/* 只需要重写你需要的即可 */
+@forward 'element-plus/theme-chalk/src/common/var.scss' with (
+  $colors: (
+  
+  'primary': (
+    
+    'base': #4FB6D3, // 湖蓝色，象征海洋、天空和自由旅行
+    
+  ),
+  
+  'success': (
+    
+    'base': #28C76F, // 成功绿，表示操作成功
+    
+  ),
+  
+  'warning': (
+    
+    'base': #FFC107, // 警告黄，用于提示信息
+    
+  ),
+  
+  'danger': (
+    
+    'base': #EA5455, // 错误红，用于错误警示
+    
+  ),
+  
+  'info': (
+    
+    'base': #555555, // 深灰色，用于文本信息
+    
+  )
+  
+),
+
+$font-family: (
+  'primary': ('Source Han Sans Regular', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif),
+),
+
+);
+
+@use "element-plus/theme-chalk/src/index.scss" as *;
+
+// 导入字体
+@font-face {
+  font-family: 'Source Han Sans Bold';
+  src: url('../assets/font/SourceHanSans-Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Han Sans Regular';
+  src: url('../assets/font/SourceHanSans-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+// 全局字体设置
+html, body {
+  font-family: 'Source Han Sans Regular', sans-serif !important;
+}
+
+// 添加表单样式覆盖
+.el-form {
+  // 表单项样式
+  .el-form-item {
+    margin-bottom: 24px;
+    
+    // 表单标签样式
+    .el-form-item__label {
+      font-family: 'Source Han Sans Regular', sans-serif !important;
+      font-weight: 500;
+      color: #555555;
+      padding-bottom: 8px;
+    }
+    
+    // 错误提示样式
+    .el-form-item__error {
+      padding-top: 4px;
+    }
+  }
+}
+
+// 标题样式
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Source Han Sans Bold', sans-serif !important;
+  font-weight: bold;
+}
+
+// 正文样式
+p, div, span {
+  font-family: 'Source Han Sans Regular', sans-serif !important;
+  line-height: 1.6;
+}
+
+// 给元素组件添加字体
+.el-button,
+.el-input,
+.el-select,
+.el-menu-item,
+.el-dropdown,
+.el-table,
+.el-dialog__title,
+.el-popover,
+.el-message {
+  font-family: 'Source Han Sans Regular', sans-serif !important;
+}
+
+
+
+
+
