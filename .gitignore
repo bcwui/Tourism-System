@@ -1,0 +1,44 @@
+# ==================== IDE & Editor ====================
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# ==================== Claude Code ====================
+.claude/
+
+# ==================== Spring Boot ====================
+springboot/target/
+springboot/.mvn/wrapper/maven-wrapper.jar
+!springboot/.mvn/wrapper/maven-wrapper.jar
+
+# Sensitive config - use application.properties.example as template
+springboot/src/main/resources/application.properties
+
+# ==================== Vue3 Frontend ====================
+vue3/node_modules/
+vue3/dist/
+vue3/node_modules.zip
+
+# Environment files (may contain secrets)
+vue3/.env
+vue3/.env.development
+vue3/.env.production
+vue3/.env.local
+vue3/.env.*.local
+
+# Logs
+vue3/npm-debug.log*
+vue3/yarn-debug.log*
+vue3/yarn-error.log*
+vue3/pnpm-debug.log*
+
+# ==================== OS Files ====================
+.DS_Store
+Thumbs.db
+
+# ==================== Personal Notes ====================
+面试准备.md
+求职准备.md
+支付宝回调404问题排查.md
