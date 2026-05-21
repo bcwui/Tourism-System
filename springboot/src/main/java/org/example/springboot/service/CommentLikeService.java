@@ -19,15 +19,10 @@ import java.util.stream.Collectors;
 public class CommentLikeService {
     @Resource
     private CommentLikeMapper commentLikeMapper;
-    
+
     @Resource
     private CommentMapper commentMapper;
-    
-    /**
-     * 点赞或取消点赞
-     * @param commentId 评论ID
-     * @return 当前点赞状态 true-已点赞 false-未点赞
-     */
+
     @Transactional
     public boolean toggleLike(Long commentId) {
         User currentUser = JwtTokenUtils.getCurrentUser();
@@ -35,70 +30,50 @@ public class CommentLikeService {
             throw new ServiceException("用户未登录");
         }
 
-        // 检查评论是否存在
         Comment comment = commentMapper.selectById(commentId);
         if (comment == null) {
             throw new ServiceException("评论不存在");
         }
-        
-        // 检查是否已点赞
+
         LambdaQueryWrapper<CommentLike> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(CommentLike::getUserId, currentUser.getId())
                    .eq(CommentLike::getCommentId, commentId);
         CommentLike like = commentLikeMapper.selectOne(queryWrapper);
-        
+
         if (like == null) {
-            // 未点赞，添加点赞
-            like = new CommentLike();
-            like.setUserId(currentUser.getId());
-            like.setCommentId(commentId);
-            commentLikeMapper.insert(like);
-            
-            // 增加评论点赞数
-            Integer currentLikes = comment.getLikes();
-            comment.setLikes(currentLikes == null ? 1 : currentLikes + 1);
-            commentMapper.updateById(comment);
-            return true;
+            // 使用 INSERT IGNORE 防止并发重复点赞
+            int inserted = commentLikeMapper.insertIgnore(currentUser.getId(), commentId);
+            if (inserted > 0) {
+                // 原子递增点赞数，与 insert 在同一个事务中
+                commentMapper.incrementLikes(commentId);
+                return true;
+            }
+            // INSERT IGNORE 返回 0 说明并发时已有其他请求先插入了
+            return false;
         } else {
-            // 已点赞，取消点赞
             commentLikeMapper.deleteById(like.getId());
-            
-            // 减少评论点赞数
-            Integer currentLikes = comment.getLikes();
-            comment.setLikes(currentLikes == null || currentLikes <= 0 ? 0 : currentLikes - 1);
-            commentMapper.updateById(comment);
+            // 原子递减点赞数
+            commentMapper.decrementLikes(commentId);
             return false;
         }
     }
-    
-    /**
-     * 检查用户是否已点赞评论
-     * @param commentId 评论ID
-     * @return 是否已点赞
-     */
+
     public boolean isLiked(Long commentId) {
         User currentUser = JwtTokenUtils.getCurrentUser();
         if (currentUser == null) {
             return false;
         }
-        
         LambdaQueryWrapper<CommentLike> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(CommentLike::getUserId, currentUser.getId())
                    .eq(CommentLike::getCommentId, commentId);
         return commentLikeMapper.selectCount(queryWrapper) > 0;
     }
-    
-    /**
-     * 批量检查评论是否已点赞
-     * @param commentIds 评论ID列表
-     * @return 已点赞的评论ID列表
-     */
+
     public List<Long> batchCheckLiked(List<Long> commentIds) {
         User currentUser = JwtTokenUtils.getCurrentUser();
         if (currentUser == null || commentIds == null || commentIds.isEmpty()) {
             return List.of();
         }
-        
         LambdaQueryWrapper<CommentLike> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(CommentLike::getUserId, currentUser.getId())
                    .in(CommentLike::getCommentId, commentIds);
@@ -107,4 +82,4 @@ public class CommentLikeService {
                                .map(CommentLike::getCommentId)
                                .collect(Collectors.toList());
     }
-} 
+}

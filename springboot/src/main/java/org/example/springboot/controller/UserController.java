@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.example.springboot.annotation.RateLimit;
 import org.example.springboot.common.Result;
 import org.example.springboot.entity.User;
 import org.example.springboot.DTO.UserPasswordUpdateDTO;
@@ -53,6 +54,7 @@ public class UserController {
         return Result.success(user);
     }
 
+    @RateLimit(prefix = "rate:limit:", key = "'login:' + #user.username", window = 60, maxRequests = 5, message = "登录请求过于频繁，请稍后再试")
     @Operation(summary = "登录")
     @PostMapping("/login")
     public Result<?> login(@RequestBody User user) {
@@ -60,6 +62,7 @@ public class UserController {
         return Result.success(loginUser);
     }
 
+    @RateLimit(prefix = "rate:limit:", key = "'login:email:' + #user.email", window = 60, maxRequests = 5, message = "登录请求过于频繁，请稍后再试")
     @Operation(summary = "邮箱登录")
     @PostMapping("/login/email")
     public Result<?> loginByEmail(@RequestBody User user) {

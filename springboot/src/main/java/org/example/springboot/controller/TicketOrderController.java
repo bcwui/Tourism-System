@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import org.example.springboot.annotation.RateLimit;
 import org.example.springboot.common.Result;
 import org.example.springboot.entity.TicketOrder;
 import org.example.springboot.entity.User;
@@ -25,6 +26,7 @@ public class TicketOrderController {
     @Resource
     private TicketOrderService ticketOrderService;
 
+    @RateLimit(prefix = "rate:limit:", key = "'order:create'", window = 10, maxRequests = 10, message = "下单过于频繁，请稍后再试")
     @Operation(summary = "创建门票订单")
     @PostMapping
     public Result<?> createOrder(@RequestBody TicketOrder order) {

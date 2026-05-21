@@ -1,6 +1,7 @@
 package org.example.springboot.controller.email;
 
 import jakarta.annotation.Resource;
+import org.example.springboot.annotation.RateLimit;
 import org.example.springboot.common.Result;
 import org.example.springboot.entity.User;
 import org.example.springboot.exception.ServiceException;
@@ -22,6 +23,7 @@ public class SendEmailController {
     @Resource
     private UserService userService;
 
+    @RateLimit(prefix = "rate:limit:", key = "'email:code:' + #email", window = 60, maxRequests = 3, message = "验证码发送过于频繁，请稍后再试")
     @GetMapping("/code/{email}")
     public Result<?> sendCode(@PathVariable String email) {
         try {
