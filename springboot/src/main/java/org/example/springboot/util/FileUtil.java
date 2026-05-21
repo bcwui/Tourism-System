@@ -15,7 +15,22 @@ import java.nio.file.Paths;
 
 public class FileUtil {
     private final static  Logger LOGGER = LoggerFactory.getLogger(FileUtil.class);
-    public final static String FILE_BASE_PATH = System.getProperty("user.dir") + "/files/";
+    public final static String FILE_BASE_PATH = resolveBasePath();
+
+    private static String resolveBasePath() {
+        String userDir = System.getProperty("user.dir");
+        // 当前目录有 pom.xml，说明就在 springboot 目录下
+        if (new File(userDir, "pom.xml").exists()) {
+            return userDir + "/files/";
+        }
+        // 否则检查子目录 springboot（从父项目启动的情况）
+        File springbootDir = new File(userDir, "springboot");
+        if (springbootDir.exists() && new File(springbootDir, "pom.xml").exists()) {
+            return springbootDir.getAbsolutePath() + "/files/";
+        }
+        // 兜底
+        return userDir + "/files/";
+    }
     // 获取项目根目录路径
     public static Path getProjectRootPath() throws IOException {
 

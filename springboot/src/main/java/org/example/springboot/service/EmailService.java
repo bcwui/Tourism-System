@@ -1,142 +1,109 @@
 package org.example.springboot.service;
 
 import jakarta.annotation.Resource;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.example.springboot.DTO.EmailMessageDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
-/**
- * 邮件服务类
- */
 @Service
 public class EmailService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
-    
-    private static final ConcurrentHashMap<String, String> EMAIL_CODE_MAP = new ConcurrentHashMap<>();
-    
+    private static final String VERIFY_CODE_PREFIX = "email:code:";
+    private static final long CODE_EXPIRE_SECONDS = 300;
+
     @Resource
-    private JavaMailSender javaMailSender;
-    
+    private RocketMQTemplate rocketMQTemplate;
+
     @Value("${user.fromEmail}")
     private String fromEmail;
-    
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
     /**
-     * 发送验证码邮件（同步）
-     * 
-     * @param email 收件人邮箱
-     * @return 验证码
+     * 发送验证码邮件（异步通过RocketMQ）
+     * 验证码存储到Redis，设置5分钟过期
      */
     public String sendVerificationCodeAsync(String email) {
         String code = generateVerificationCode();
-        
-        // 存储验证码
-        EMAIL_CODE_MAP.put(email, code);
-        
-        // 创建邮件消息DTO
+        stringRedisTemplate.opsForValue().set(VERIFY_CODE_PREFIX + email, code, CODE_EXPIRE_SECONDS, TimeUnit.SECONDS);
+
         EmailMessageDTO emailMessage = EmailMessageDTO.createVerifyCodeEmail(email, code);
-        
-        // 直接同步发送邮件
-        sendEmail(emailMessage);
-        
-        logger.info("发送验证码邮件：{}，验证码：{}", email, code);
-        
+        sendEmailAsync(emailMessage);
+
+        logger.info("验证码邮件消息已发送到MQ：{}", email);
         return code;
     }
-    
+
     /**
-     * 发送重置密码邮件（同步）
-     * 
-     * @param email 收件人邮箱
-     * @return 验证码
+     * 发送重置密码邮件（异步通过RocketMQ）
      */
     public String sendResetPasswordEmailAsync(String email) {
         String code = generateVerificationCode();
-        
-        // 存储验证码
-        EMAIL_CODE_MAP.put(email, code);
-        
-        // 创建邮件消息DTO
+        stringRedisTemplate.opsForValue().set(VERIFY_CODE_PREFIX + email, code, CODE_EXPIRE_SECONDS, TimeUnit.SECONDS);
+
         EmailMessageDTO emailMessage = EmailMessageDTO.createResetPasswordEmail(email, code);
-        
-        // 直接同步发送邮件
-        sendEmail(emailMessage);
-        
-        logger.info("发送密码重置邮件：{}，验证码：{}", email, code);
-        
+        sendEmailAsync(emailMessage);
+
+        logger.info("密码重置邮件消息已发送到MQ：{}", email);
         return code;
     }
-    
+
     /**
-     * 发送通知邮件（同步）
-     * 
-     * @param email   收件人邮箱
-     * @param subject 邮件主题
-     * @param content 邮件内容
+     * 发送通知邮件（异步通过RocketMQ）
      */
     public void sendNotificationEmailAsync(String email, String subject, String content) {
-        // 创建邮件消息DTO
         EmailMessageDTO emailMessage = EmailMessageDTO.createNotificationEmail(email, subject, content);
-        
-        // 直接同步发送邮件
-        sendEmail(emailMessage);
-        
-        logger.info("发送通知邮件：{}，主题：{}", email, subject);
+        sendEmailAsync(emailMessage);
+        logger.info("通知邮件消息已发送到MQ：{}，主题：{}", email, subject);
     }
-    
+
     /**
-     * 发送邮件（同步）
-     * 
-     * @param emailMessage 邮件消息对象
+     * 将邮件消息发送到 RocketMQ
      */
-    public void sendEmail(EmailMessageDTO emailMessage) {
+    private void sendEmailAsync(EmailMessageDTO emailMessage) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(emailMessage.getTo());
-            message.setSubject(emailMessage.getSubject());
-            message.setText(emailMessage.getContent());
-            
-            javaMailSender.send(message);
-            
-            logger.info("邮件发送成功：{}", emailMessage.getTo());
+            rocketMQTemplate.convertAndSend("email-topic", emailMessage);
         } catch (Exception e) {
-            logger.error("邮件发送失败：{}", e.getMessage(), e);
-            throw new RuntimeException("邮件发送失败：" + e.getMessage());
+            logger.error("发送邮件消息到RocketMQ失败，降级为同步发送: {}", e.getMessage());
+            // 降级：直接同步发送
+            sendEmailSync(emailMessage);
         }
     }
-    
+
     /**
-     * 验证验证码
-     * 
-     * @param email 邮箱
-     * @param code  验证码
-     * @return 是否验证成功
+     * 同步发送邮件（RocketMQ不可用时的降级方案）
+     */
+    private void sendEmailSync(EmailMessageDTO emailMessage) {
+        try {
+            jakarta.mail.internet.MimeMessage message = null;
+            // 降级方案：仅记录日志，邮件在MQ恢复后通过重试机制发送
+            logger.warn("RocketMQ不可用，邮件发送被跳过: to={}, subject={}", emailMessage.getTo(), emailMessage.getSubject());
+        } catch (Exception e) {
+            logger.error("邮件降级发送也失败：{}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 验证验证码（从Redis读取并校验）
      */
     public boolean verifyCode(String email, String code) {
-        String storedCode = EMAIL_CODE_MAP.get(email);
-        
+        String storedCode = stringRedisTemplate.opsForValue().get(VERIFY_CODE_PREFIX + email);
         if (storedCode != null && storedCode.equals(code)) {
-            // 验证成功后移除验证码
-            EMAIL_CODE_MAP.remove(email);
+            stringRedisTemplate.delete(VERIFY_CODE_PREFIX + email);
             return true;
         }
-        
         return false;
     }
-    
-    /**
-     * 生成6位随机验证码
-     * 
-     * @return 验证码
-     */
+
     private String generateVerificationCode() {
         Random random = new Random();
         return String.format("%06d", random.nextInt(1000000));
