@@ -22,10 +22,13 @@ import java.util.Map;
 @RequestMapping("/alipay")
 public class AlipayController {
     private static final Logger LOGGER = LoggerFactory.getLogger(AlipayController.class);
-    
+
+    @org.springframework.beans.factory.annotation.Value("${frontend.url:http://localhost:8080}")
+    private String frontendUrl;
+
     @Resource
     private AlipayService alipayService;
-    
+
     @Resource
     private TicketOrderService ticketOrderService;
 
@@ -63,7 +66,7 @@ public class AlipayController {
         try {
             alipayService.handleAlipayReturn(params);
             // 支付处理成功，重定向到成功页面
-            redirectUrl = "http://localhost:8080/payment/result?out_trade_no=" + outTradeNo + "&status=success";
+            redirectUrl = frontendUrl + "/payment/result?out_trade_no=" + outTradeNo + "&status=success";
             LOGGER.info("支付成功，重定向到: {}", redirectUrl);
         } catch (Exception e) {
             LOGGER.error("处理支付宝同步回调失败: {}", e.getMessage(), e);
@@ -74,16 +77,16 @@ public class AlipayController {
                 TicketOrder order = ticketOrderService.getOrderByOrderNo(outTradeNo);
                 if (order != null && order.getStatus() == 1) {
                     // 订单状态已经是已支付，说明支付成功，只是消息发送失败
-                    redirectUrl = "http://localhost:8080/payment/result?out_trade_no=" + outTradeNo + "&status=success";
+                    redirectUrl = frontendUrl + "/payment/result?out_trade_no=" + outTradeNo + "&status=success";
                     LOGGER.info("订单状态已更新为已支付，重定向到成功页面: {}", redirectUrl);
                 } else {
                     // 订单状态未更新，确实是支付失败
-                    redirectUrl = "http://localhost:8080/payment/result?out_trade_no=" + outTradeNo + "&status=failed";
+                    redirectUrl = frontendUrl + "/payment/result?out_trade_no=" + outTradeNo + "&status=failed";
                     LOGGER.info("订单状态未更新，重定向到失败页面: {}", redirectUrl);
                 }
             } catch (Exception ex) {
                 // 查询订单也失败，重定向到失败页面
-                redirectUrl = "http://localhost:8080/payment/result?out_trade_no=" + outTradeNo + "&status=failed";
+                redirectUrl = frontendUrl + "/payment/result?out_trade_no=" + outTradeNo + "&status=failed";
                 LOGGER.error("查询订单状态失败，重定向到失败页面: {}", redirectUrl, ex);
             }
         }

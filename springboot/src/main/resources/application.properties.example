@@ -76,3 +76,28 @@ spring.data.redis.lettuce.pool.max-active=8
 spring.data.redis.lettuce.pool.max-wait=-1ms
 spring.data.redis.lettuce.pool.max-idle=8
 spring.data.redis.lettuce.pool.min-idle=0
+
+# ==================== RabbitMQ ====================
+spring.rabbitmq.host=127.0.0.1
+spring.rabbitmq.port=5672
+spring.rabbitmq.username=guest
+spring.rabbitmq.password=guest
+spring.rabbitmq.virtual-host=/
+spring.rabbitmq.listener.simple.acknowledge-mode=auto
+spring.rabbitmq.listener.simple.retry.enabled=true
+spring.rabbitmq.listener.simple.retry.max-attempts=3
+spring.rabbitmq.listener.simple.retry.initial-interval=1000
+
+# MQ consumer switches
+mq.consumer.email=true
+mq.consumer.order=true
+mq.consumer.seckill=true
+
+# ==================== Rate Limit ====================
+rate.limit.enabled=true
+rate.limit.default-max-requests=20
+rate.limit.default-window=60
+
+# Frontend URL (payment redirect)
+frontend.url=http://localhost:8080
+

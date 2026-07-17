@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.example.springboot.DTO.OrderMessageDTO;
+import static org.example.springboot.config.RabbitMQConfig.ORDER_EXCHANGE;
+import static org.example.springboot.config.RabbitMQConfig.ORDER_ROUTING_KEY;
 import org.example.springboot.entity.ScenicSpot;
 import org.example.springboot.entity.Ticket;
 import org.example.springboot.entity.TicketOrder;
@@ -48,7 +50,7 @@ public class TicketOrderService {
     @Resource
     private RedisLockUtil redisLockUtil;
     @Resource
-    private RocketMQTemplate rocketMQTemplate;
+    private RabbitTemplate rabbitTemplate;
 
     @Transactional
     public TicketOrder createOrder(TicketOrder order) {
@@ -93,7 +95,7 @@ public class TicketOrderService {
         // 发送异步订单消息到 RocketMQ
         try {
             OrderMessageDTO msg = buildOrderMessage(order, ticket, currentUser, "ORDER_CREATED");
-            rocketMQTemplate.convertAndSend("order-topic", msg);
+            rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_ROUTING_KEY, msg);
         } catch (Exception e) {
             logger.error("发送订单创建消息失败，订单号：{}，错误：{}", order.getOrderNo(), e.getMessage(), e);
         }
@@ -120,7 +122,7 @@ public class TicketOrderService {
             Ticket ticket = ticketMapper.selectById(order.getTicketId());
             User user = userMapper.selectById(order.getUserId());
             OrderMessageDTO msg = buildOrderMessage(order, ticket, user, "ORDER_PAID");
-            rocketMQTemplate.convertAndSend("order-topic", msg);
+            rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_ROUTING_KEY, msg);
         } catch (Exception e) {
             logger.error("发送订单支付消息失败，订单号：{}，错误：{}", order.getOrderNo(), e.getMessage(), e);
         }
@@ -153,10 +155,32 @@ public class TicketOrderService {
         try {
             Ticket ticket = ticketMapper.selectById(order.getTicketId());
             OrderMessageDTO msg = buildOrderMessage(order, ticket, currentUser, "ORDER_CANCELLED");
-            rocketMQTemplate.convertAndSend("order-topic", msg);
+            rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_ROUTING_KEY, msg);
         } catch (Exception e) {
             logger.error("发送订单取消消息失败，订单号：{}，错误：{}", order.getOrderNo(), e.getMessage(), e);
         }
+    }
+
+    @Transactional
+    public void cancelOrderSystem(TicketOrder order) {
+        if (order.getStatus() != 0) {
+            return;
+        }
+        order.setStatus(2);
+        ticketOrderMapper.updateById(order);
+        ticketService.restoreStock(order.getTicketId(), order.getQuantity());
+
+        try {
+            Ticket ticket = ticketMapper.selectById(order.getTicketId());
+            User user = userMapper.selectById(order.getUserId());
+            OrderMessageDTO msg = buildOrderMessage(order, ticket, user, "ORDER_CANCELLED");
+            rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_ROUTING_KEY, msg);
+        } catch (Exception e) {
+            logger.error("发送订单取消消息失败，订单号：{}，错误：{}", order.getOrderNo(), e.getMessage(), e);
+        }
+
+        logger.info("系统自动取消过期订单: orderNo={}, userId={}, amount={}, createTime={}",
+                order.getOrderNo(), order.getUserId(), order.getTotalAmount(), order.getCreateTime());
     }
 
     @Transactional
@@ -185,7 +209,7 @@ public class TicketOrderService {
             Ticket ticket = ticketMapper.selectById(order.getTicketId());
             User user = userMapper.selectById(order.getUserId());
             OrderMessageDTO msg = buildOrderMessage(order, ticket, user, "ORDER_REFUNDED");
-            rocketMQTemplate.convertAndSend("order-topic", msg);
+            rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_ROUTING_KEY, msg);
         } catch (Exception e) {
             logger.error("发送订单退款消息失败，订单号：{}，错误：{}", order.getOrderNo(), e.getMessage(), e);
         }
@@ -216,7 +240,7 @@ public class TicketOrderService {
             Ticket ticket = ticketMapper.selectById(order.getTicketId());
             User user = userMapper.selectById(order.getUserId());
             OrderMessageDTO msg = buildOrderMessage(order, ticket, user, "ORDER_COMPLETED");
-            rocketMQTemplate.convertAndSend("order-topic", msg);
+            rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ORDER_ROUTING_KEY, msg);
         } catch (Exception e) {
             logger.error("发送订单完成消息失败，订单号：{}，错误：{}", order.getOrderNo(), e.getMessage(), e);
         }

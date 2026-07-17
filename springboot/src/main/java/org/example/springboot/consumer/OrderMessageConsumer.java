@@ -1,23 +1,22 @@
 package org.example.springboot.consumer;
 
-import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
-import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.example.springboot.DTO.OrderMessageDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import static org.example.springboot.config.RabbitMQConfig.ORDER_QUEUE;
+
 @Component
-@RocketMQMessageListener(
-    topic = "order-topic",
-    consumerGroup = "tourism-order-consumer-group"
-)
-public class OrderMessageConsumer implements RocketMQListener<OrderMessageDTO> {
+@ConditionalOnProperty(name = "mq.consumer.order", havingValue = "true")
+public class OrderMessageConsumer {
 
     private static final Logger logger = LoggerFactory.getLogger(OrderMessageConsumer.class);
 
-    @Override
-    public void onMessage(OrderMessageDTO message) {
+    @RabbitListener(queues = ORDER_QUEUE)
+    public void handleOrderMessage(OrderMessageDTO message) {
         logger.info("收到订单消息: eventType={}, orderNo={}, status={}",
                 message.getEventType(), message.getOrderNo(), message.getStatus());
 

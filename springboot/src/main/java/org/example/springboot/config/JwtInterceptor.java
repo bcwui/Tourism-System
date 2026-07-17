@@ -13,7 +13,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.example.springboot.entity.User;
-import org.example.springboot.service.UserService;
+import org.example.springboot.mapper.UserMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -22,11 +22,12 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 
 
+
 @Component
 public class JwtInterceptor implements HandlerInterceptor {
     public static final Logger LOGGER = LoggerFactory.getLogger(HandlerInterceptor.class);
     @Resource
-    private UserService userService;
+    private UserMapper userMapper;
 
     @Override
     public boolean preHandle(HttpServletRequest request,  HttpServletResponse response,  Object handler) throws Exception {
@@ -35,20 +36,20 @@ public class JwtInterceptor implements HandlerInterceptor {
             token = request.getParameter("token");
         }
         if (StringUtils.isBlank(token)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401状态码
-            response.getWriter().print("Token缺失"); // 返回错误信息
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().print("Token缺失");
             return false;
         }
 
         User user;
         try {
             String userId = JWT.decode(token).getAudience().get(0);
-            user = userService.getUserById(Long.valueOf(userId));
+            user = userMapper.selectById(Long.valueOf(userId));
         } catch (Exception e) {
             String errMsg = "token失效，重新登录！";
             LOGGER.error(errMsg + " ,token=" + token, e);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().print(errMsg); // 返回错误信息
+            response.getWriter().print(errMsg);
             return false;
         }
         if (user == null) {

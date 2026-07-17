@@ -1,16 +1,19 @@
 package org.example.springboot.service;
 
 import jakarta.annotation.Resource;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.example.springboot.DTO.EmailMessageDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+
+import static org.example.springboot.config.RabbitMQConfig.EMAIL_EXCHANGE;
+import static org.example.springboot.config.RabbitMQConfig.EMAIL_ROUTING_KEY;
 
 @Service
 public class EmailService {
@@ -20,9 +23,9 @@ public class EmailService {
     private static final long CODE_EXPIRE_SECONDS = 300;
 
     @Resource
-    private RocketMQTemplate rocketMQTemplate;
+    private RabbitTemplate rabbitTemplate;
 
-    @Value("${user.fromEmail}")
+    @Value("${user.fromEmail:}")
     private String fromEmail;
 
     @Resource
@@ -71,7 +74,7 @@ public class EmailService {
      */
     private void sendEmailAsync(EmailMessageDTO emailMessage) {
         try {
-            rocketMQTemplate.convertAndSend("email-topic", emailMessage);
+            rabbitTemplate.convertAndSend(EMAIL_EXCHANGE, EMAIL_ROUTING_KEY, emailMessage);
         } catch (Exception e) {
             logger.error("发送邮件消息到RocketMQ失败，降级为同步发送: {}", e.getMessage());
             // 降级：直接同步发送
