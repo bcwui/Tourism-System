@@ -11,6 +11,18 @@
           探索各地热门景点，预订优惠门票，开启美好旅程
         </p>
       </div>
+      <div class="header-actions">
+        <el-button
+          type="danger"
+          size="large"
+          @click="goToSeckillZone"
+          class="seckill-zone-btn"
+        >
+          <el-icon><Lightning /></el-icon>
+          秒杀专区
+          <span v-if="activeSeckillCount > 0" class="seckill-count">{{ activeSeckillCount }}场进行中</span>
+        </el-button>
+      </div>
     </div>
 
     <!-- 现代化搜索区域 - 参考景点列表页面 -->
@@ -133,6 +145,13 @@
           >
             <div class="card-header">
               <div class="ticket-type-badge">{{ ticket.ticketType }}</div>
+              <div
+                v-if="hasSeckill(ticket.id)"
+                class="seckill-badge"
+                @click.stop="goToSeckill(ticket.id)"
+              >
+                ⚡秒杀 ¥{{ getSeckillPrice(ticket.id) }}
+              </div>
               <div class="card-actions">
                 <el-button
                   type="primary"
@@ -207,7 +226,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
-import { Search, Refresh, Ticket, Calendar, Goods } from '@element-plus/icons-vue'
+import { Search, Refresh, Ticket, Calendar, Goods, Lightning } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
@@ -219,6 +238,10 @@ const total = ref(0)
 // 门票列表数据
 const ticketList = ref([])
 const loading = ref(false)
+
+// 秒杀活动数据
+const seckillMap = ref({})  // ticketId -> { activityId, seckillPrice }
+const activeSeckillCount = ref(0)
 
 // 搜索表单
 const searchForm = reactive({
@@ -307,9 +330,58 @@ const goToBooking = (ticketId) => {
   router.push(`/ticket/booking/${ticketId}`)
 }
 
+// 获取秒杀活动列表
+const fetchSeckillList = async () => {
+  try {
+    await request.get('/seckill/list', {}, {
+      showDefaultMsg: false,
+      onSuccess: (res) => {
+        const map = {}
+        let count = 0
+        if (res && Array.isArray(res)) {
+          res.forEach(item => {
+            map[item.ticketId] = {
+              activityId: item.activityId,
+              seckillPrice: item.seckillPrice
+            }
+            count++
+          })
+        }
+        seckillMap.value = map
+        activeSeckillCount.value = count
+      }
+    })
+  } catch (error) {
+    console.error('获取秒杀列表失败:', error)
+  }
+}
+
+// 检查门票是否有秒杀活动
+const hasSeckill = (ticketId) => {
+  return !!seckillMap.value[ticketId]
+}
+
+// 获取秒杀价格
+const getSeckillPrice = (ticketId) => {
+  const item = seckillMap.value[ticketId]
+  return item ? item.seckillPrice : ''
+}
+
+// 前往秒杀页面
+const goToSeckill = (ticketId) => {
+  router.push(`/ticket/seckill/${ticketId}`)
+}
+
+// 前往秒杀专区
+const goToSeckillZone = () => {
+  router.push('/tickets')
+  // 滚动到包含秒杀门票的位置
+}
+
 // 页面加载时获取门票列表
 onMounted(() => {
   fetchTickets()
+  fetchSeckillList()
 })
 </script>
 
@@ -339,6 +411,49 @@ onMounted(() => {
 
   .header-content {
     flex: 1;
+  }
+
+  .header-actions {
+    flex-shrink: 0;
+    margin-left: 24px;
+
+    .seckill-zone-btn {
+      background: linear-gradient(45deg, #e53e3e, #c53030);
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 12px 24px;
+      box-shadow: 0 4px 15px rgba(229, 62, 62, 0.4);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+        animation: shimmer 2s ease-in-out infinite;
+      }
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(229, 62, 62, 0.6);
+      }
+
+      .seckill-count {
+        background: rgba(255, 255, 255, 0.25);
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        margin-left: 8px;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+    }
   }
 
   .page-title {
@@ -601,6 +716,22 @@ onMounted(() => {
     backdrop-filter: blur(10px);
   }
 
+  .seckill-badge {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    background: linear-gradient(45deg, #fc8181, #e53e3e);
+    color: white;
+    cursor: pointer;
+    animation: pulse 1.5s ease-in-out infinite;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.05);
+    }
+  }
+
   .card-actions {
     .quick-book-btn {
       border-radius: 50%;
@@ -796,6 +927,16 @@ onMounted(() => {
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.75; }
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%) rotate(0deg); }
+    100% { transform: translateX(100%) rotate(0deg); }
   }
 
 }

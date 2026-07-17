@@ -76,6 +76,12 @@ export const backendRoutes = [
         meta: { title: '住宿管理', icon: 'House' }
       },
       {
+        path: 'seckill',
+        name: 'SeckillManagement',
+        component: () => import('@/views/backend/seckill/index.vue'),
+        meta: { title: '秒杀管理', icon: 'Timer' }
+      },
+      {
         path: 'carousel',
         name: 'CarouselManagement',
         component: () => import('@/views/backend/carousel/index.vue'),
@@ -126,6 +132,12 @@ const frontendRoutes = [
         name: 'TicketBooking',
         component: () => import('@/views/frontend/ticket/booking.vue'),
         meta: { title: '预订门票', requiresAuth: true }
+      },
+      {
+        path: 'ticket/seckill/:ticketId',
+        name: 'TicketSeckill',
+        component: () => import('@/views/frontend/ticket/seckill.vue'),
+        meta: { title: '限时秒杀', requiresAuth: true }
       },
       {
         path: 'orders',

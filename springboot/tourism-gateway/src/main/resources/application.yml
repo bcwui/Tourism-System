@@ -1,0 +1,59 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: tourism-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        namespace: public
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # User Service
+        - id: tourism-user
+          uri: lb://tourism-user
+          predicates:
+            - Path=/api/user/**
+          filters:
+            - StripPrefix=0
+        # Scenic Service (scenic spots + categories + tickets)
+        - id: tourism-scenic
+          uri: lb://tourism-scenic
+          predicates:
+            - Path=/api/scenic/**,/api/scenic-category/**,/api/ticket/**
+          filters:
+            - StripPrefix=0
+        # Order Service (orders + alipay + seckill)
+        - id: tourism-order
+          uri: lb://tourism-order
+          predicates:
+            - Path=/api/order/**,/api/alipay/**,/api/seckill/**
+          filters:
+            - StripPrefix=0
+        # Social Service (comments + guides + collections + carousel + search)
+        - id: tourism-social
+          uri: lb://tourism-social
+          predicates:
+            - Path=/api/comment/**,/api/guide/**,/api/collection/**,/api/scenic-collection/**,/api/carousel/**,/api/search/**
+          filters:
+            - StripPrefix=0
+        # Accommodation Service
+        - id: tourism-accommodation
+          uri: lb://tourism-accommodation
+          predicates:
+            - Path=/api/accommodation/**
+          filters:
+            - StripPrefix=0
+        # File Service (files + email + sms + monitor + redis)
+        - id: tourism-file
+          uri: lb://tourism-file
+          predicates:
+            - Path=/api/file/**,/api/img/**,/api/email/**,/api/sms/**,/api/monitor/**,/api/redis/**
+          filters:
+            - StripPrefix=0

@@ -1,0 +1,96 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: tourism-order
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/tourism_system?useUnicode=true&characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&serverTimezone=GMT%2b8&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 123456
+      database: 0
+      timeout: 10000
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+  cloud:
+    nacos:
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+      discovery:
+        server-addr: 127.0.0.1:8848
+        namespace: public
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    listener:
+      simple:
+        acknowledge-mode: auto
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  mapper-locations: classpath:/mapper/*.xml
+
+
+mq:
+  consumer:
+    order: true
+    seckill: true
+
+rate:
+  limit:
+    enabled: true
+    default-max-requests: 20
+    default-window: 60
+
+user:
+  fromEmail: 3536615715@qq.com
+  defaultPassword: 123456
+
+frontend:
+  url: http://localhost:8087
+
+alipay:
+  appId: 9021000162618406
+  privateKey: MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCLz1nCnpCFc4Z6xTgtM1PeUuk/eDSc68JkjdugjKdrjbGKwlmViOahOF6lbQC4lVXL4roFecJRbeLKMhW6KdttKHUnMY/KeU7dxlqkwEPF4KNV1YtnvYjAsbpF7BkCx/OKNbrzMKcCU85VGrzq80JMggJxXq37nc1vt7+GNFyoWOPBGd+NTRLBtneDkrm0WIpfw7/+uZIWAZRzZHJb+tpa89ARwRgHYi3TesVvbUl91a0ZMj9LcjpI38TeTpIgKJuYCpJAXvARUfG1kWtP2ZCdmP9jJD0f/DuzFaFV7uscBDD3X0I+yUd9hl+7l+0NgGuW/KALcidC8H1MgTiDpGW9AgMBAAECggEAUOJN4K1RmRND2uUcYfIO9FFtRd3qOlqe5QO460JUXYHlFAzqPPutydnNz9CnGSK0NzddPWu6wtda3HVrYn9yxc0hMeKXeKEDwoRNzoC49NLITBE2DHd3lVt9E5TKx3Qcbno1RRqBlHQdq9jDMP44/gA9H4+SAj7CKn7Ym/DRJkcj3YEOyoLwP5WaGzOP6MwJQC9GIOWcw9fjAuF2YXg+kLjQ+Le9iCgTZgIICmPJB7HxDGc8De3Y/kxGhOV/XDzlDJoJzg/dymEdVTgKGgL0tcfDBBIheFdq+E0c19PUARoH+8lzvbgIv02BOvcUbiGYRqaFwIEfXT9HFyFu+RwX4QKBgQC9bL96T/d4Wr/I5gAKmhrhBZGgyPshVzR8poyalczkRyRzc7Lbe8fZVVZFqydFY8b0ApQqWVcsUZBNXVrqNLiV+mTMlgsS+XPQXygAMbtloOT+M+Sw8hIAlxDATbg7d5TB1jOPitUufvFMIDXWzfgeVXrRVqZouD1LE25RMTEByQKBgQC88pJrzi3PDOMMrZ4rFgcsSpMzAyIRUSbjWItgFTatgfjf89/xiCsz6f7ISxIM2xbM0LFEi7u85Pvb1Gfcp3bKzZJ/1EzGbOAVXu/eJLiKHfd/mjRuIwLmgLJeiaMabMBzOq7wVWMky2oVVst39f11ctTVWZdpLmPKgOk3ZX9eVQKBgQCOxknosh9v+s61aQ687vy1gNIMI5CNx8IK9iniVmix4yGJV7qHDlxK5rR5HJEkDxmlT9BHv0EiaXPfrC7betNqT+nr/mfobFcrxp1K0DFUX5paM9j6uepxwWth1vK29+IK3B3O4rDeM9ZCL8EE4AhVLM6+vJX/NmcUkFfFINO0aQKBgQCYuMi48pH8RUJQQRUTZl6t4ilQlju3G4z/PdaJ9xuW6vMqsYhVRecFsyEI7ATO91dafWSLLxaz+7HHYcwBgip2ierb/9F+oQoOvAnN2IiAuvAN56pxS0NQ5L1HxKBc/4IeoVQ9Vgco+nHohZs4f1A62nJFcID9t01ZpRDcgeGNcQKBgB4HJ/rseIYf5ym7OD/hSiy1FTSU0VhIKGy7SgqV7dt5/xfBLMxr75IIMy6ZZfHOJKXo9bx6eeEoXDLq3HAa0bmrPTS6PNB4sTRfWmycUG53DEwYNG8DKKF4lRvxtEeO0Ho8YFZUHzxlT0hR2GxKGGchtPuh3ERahBfs1JjCQbf2
+  publicKey: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkzYg2AgZwEcN+EfEPZBGBrGM+hL+XbtqXH2tsUs5t2BQRMFNVgi2aEHybHu4sxs2j4O/Af28s8ILRy4mjB6GZxDOrkz16rlT9F5G//ZbsXyP8AE/uWAZytMPy4GKhLmmDEHhNbCmZ5vO+vo6OTI+g2CSawLyhqOhA6due60IwPlptZChzVxj8onJFiaRrDRzJDmR5/o1htaz96VLOcHOx2ufKSfH841w9efRrwNk1OJm/Wv+axartQ6TWvbP5FPxyeqJxlEPPwjFOuPRW6wyFujTff/J5atuMMH52FDrWmXjKh4+iZ6JnQVYiWW9VIfCd2Cp71oXHwZVkMctl0F/oQIDAQAB
+  gateway: https://openapi-sandbox.dl.alipaydev.com/gateway.do
+  returnUrl: http://localhost:8080/api/alipay/return
+  notifyUrl: http://k2a368e2.natappfree.cc/api/alipay/notify
+  charset: UTF-8
+  format: json
+  signType: RSA2
+
+# API Documentation
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  packages-to-scan: org.example.springboot
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn

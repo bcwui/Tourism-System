@@ -53,7 +53,12 @@
           <el-icon><Ticket /></el-icon>
           <template #title>门票管理</template>
         </el-menu-item>
-        
+
+        <el-menu-item index="/back/seckill" v-if="userStore.isAdmin">
+          <el-icon><Timer /></el-icon>
+          <template #title>秒杀管理</template>
+        </el-menu-item>
+
         <el-menu-item index="/back/order" v-if="userStore.isAdmin">
           <el-icon><List /></el-icon>
           <template #title>订单管理</template>
@@ -89,6 +94,7 @@ import {
   Document,
   Star,
   Ticket,
+  Timer,
   List,
   House,
   Picture
