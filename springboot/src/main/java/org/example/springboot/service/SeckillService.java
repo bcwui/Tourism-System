@@ -102,9 +102,13 @@ public class SeckillService {
         if (stockStr != null) {
             return Long.parseLong(stockStr);
         }
-        // Redis 未预热，返回 DB 中的实际库存
         SeckillActivity activity = seckillActivityMapper.selectById(activityId);
         return activity != null ? activity.getSeckillStock() : 0;
+    }
+
+    public int getUserBoughtCount(Long activityId, Long userId) {
+        Object bought = stringRedisTemplate.opsForHash().get(SECKILL_USERS_PREFIX + activityId, userId.toString());
+        return bought != null ? Integer.parseInt(bought.toString()) : 0;
     }
 
     /**
@@ -145,16 +149,17 @@ public class SeckillService {
             throw new ServiceException("门票不可用");
         }
 
-        // 3. 限购检查：每人限购
+        // 3. 限购检查：每人限购（Redis Hash 记录累计购买数量）
         String usersKey = SECKILL_USERS_PREFIX + activityId;
-        Boolean alreadyBought = stringRedisTemplate.opsForSet().isMember(usersKey, user.getId().toString());
-        if (Boolean.TRUE.equals(alreadyBought)) {
-            throw new ServiceException("您已参与过本次秒杀");
-        }
         Integer limitPerUser = activity.getLimitPerUser() != null ? activity.getLimitPerUser() : 1;
         int buyQty = request.getQuantity() != null ? request.getQuantity() : 1;
-        if (buyQty > limitPerUser) {
-            throw new ServiceException("每人限购" + limitPerUser + "张");
+        String userIdStr = user.getId().toString();
+
+        // 获取用户累计已购数量
+        Object boughtObj = stringRedisTemplate.opsForHash().get(usersKey, userIdStr);
+        int alreadyBought = boughtObj != null ? Integer.parseInt(boughtObj.toString()) : 0;
+        if (alreadyBought + buyQty > limitPerUser) {
+            throw new ServiceException("每人限购" + limitPerUser + "张，您已购买" + alreadyBought + "张");
         }
 
         // 4. Redis原子扣库存（若未预热则用 SETNX 自动初始化，防并发覆写）
@@ -173,8 +178,8 @@ public class SeckillService {
             throw new ServiceException("秒杀库存不足");
         }
 
-        // 5. 标记用户已购买
-        stringRedisTemplate.opsForSet().add(usersKey, user.getId().toString());
+        // 5. 累加用户购买数量（Redis Hash）
+        stringRedisTemplate.opsForHash().increment(usersKey, userIdStr, buyQty);
 
         // 6. 发送异步下单消息
         try {
@@ -186,7 +191,7 @@ public class SeckillService {
         } catch (Exception e) {
             logger.error("秒杀下单消息发送失败，回滚库存: userId={}, activityId={}", user.getId(), activityId, e);
             stringRedisTemplate.opsForValue().increment(stockKey, buyQty);
-            stringRedisTemplate.opsForSet().remove(usersKey, user.getId().toString());
+            stringRedisTemplate.opsForHash().increment(usersKey, userIdStr, -buyQty);
             throw new ServiceException("系统繁忙，请稍后重试");
         }
 
@@ -198,7 +203,12 @@ public class SeckillService {
      */
     public void rollbackSeckill(Long activityId, Long userId, int quantity) {
         stringRedisTemplate.opsForValue().increment(SECKILL_STOCK_PREFIX + activityId, quantity);
-        stringRedisTemplate.opsForSet().remove(SECKILL_USERS_PREFIX + activityId, userId.toString());
+        String usersKey = SECKILL_USERS_PREFIX + activityId;
+        String userIdStr = userId.toString();
+        Long remaining = stringRedisTemplate.opsForHash().increment(usersKey, userIdStr, -quantity);
+        if (remaining != null && remaining <= 0) {
+            stringRedisTemplate.opsForHash().delete(usersKey, userIdStr);
+        }
         logger.info("秒杀已回滚: userId={}, activityId={}, quantity={}", userId, activityId, quantity);
     }
 

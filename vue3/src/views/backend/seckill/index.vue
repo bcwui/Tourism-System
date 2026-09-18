@@ -8,7 +8,7 @@
     <div class="action-bar">
       <div class="action-right">
         <el-button type="primary" @click="showAddDialog" class="add-btn">
-          <i class="el-icon-plus"></i> 添加秒杀活动
+          <el-icon><Plus /></el-icon> 添加秒杀活动
         </el-button>
       </div>
     </div>
@@ -49,23 +49,23 @@
         <el-table-column prop="limitPerUser" label="限购" width="70" />
         <el-table-column prop="startTime" label="开始时间" width="160" />
         <el-table-column prop="endTime" label="结束时间" width="160" />
-        <el-table-column prop="status" label="状态" width="90">
+        <el-table-column label="状态" width="100">
           <template #default="scope">
-            <el-tag v-if="scope.row.status === 0" type="info">未开始</el-tag>
-            <el-tag v-else-if="scope.row.status === 1" type="success">进行中</el-tag>
-            <el-tag v-else-if="scope.row.status === 2" type="danger">已结束</el-tag>
+            <el-tag v-if="computeStatus(scope.row) === 'upcoming'" type="info">未开始</el-tag>
+            <el-tag v-else-if="computeStatus(scope.row) === 'active'" type="success">进行中</el-tag>
+            <el-tag v-else type="danger">已结束</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="scope">
-            <el-button type="warning" size="small" plain @click="handlePreload(scope.row)" class="action-btn">
-              <i class="el-icon-lightning"></i> 预热
+            <el-button type="warning" size="small" plain :loading="preloadingId === scope.row.id" @click="handlePreload(scope.row)" class="action-btn">
+              <el-icon><Lightning /></el-icon> 预热
             </el-button>
             <el-button type="primary" size="small" plain @click="handleEdit(scope.row)" class="action-btn">
-              <i class="el-icon-edit"></i> 编辑
+              <el-icon><Edit /></el-icon> 编辑
             </el-button>
             <el-button type="danger" size="small" plain @click="handleDelete(scope.row)" class="action-btn">
-              <i class="el-icon-delete"></i> 删除
+              <el-icon><Delete /></el-icon> 删除
             </el-button>
           </template>
         </el-table-column>
@@ -133,15 +133,6 @@
               <el-input-number v-model="formData.limitPerUser" :min="1" :max="10" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="活动状态" prop="status">
-              <el-select v-model="formData.status" style="width: 100%">
-                <el-option label="未开始" :value="0" />
-                <el-option label="进行中" :value="1" />
-                <el-option label="已结束" :value="2" />
-              </el-select>
-            </el-form-item>
-          </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -181,8 +172,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
+import { Plus, Edit, Delete, Lightning } from '@element-plus/icons-vue'
 import { adminGetSeckillList, adminCreateSeckill, adminUpdateSeckill, adminDeleteSeckill, adminPreloadSeckillStock } from '@/api/seckill'
 import request from '@/utils/request'
 
@@ -191,6 +183,24 @@ const pageSize = ref(10)
 const total = ref(0)
 const activityList = ref([])
 const loading = ref(false)
+const preloadingId = ref(null)
+const now = ref(Date.now())
+
+let statusTimer = null
+
+const parseTime = (str) => {
+  if (!str) return 0
+  return new Date(str.replace(' ', 'T')).getTime()
+}
+
+const computeStatus = (row) => {
+  const t = now.value
+  const start = parseTime(row.startTime)
+  const end = parseTime(row.endTime)
+  if (t < start) return 'upcoming'
+  if (t <= end) return 'active'
+  return 'ended'
+}
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -205,8 +215,7 @@ const formData = reactive({
   seckillStock: 0,
   limitPerUser: 1,
   startTime: '',
-  endTime: '',
-  status: 0
+  endTime: ''
 })
 
 const formRules = {
@@ -215,8 +224,7 @@ const formRules = {
   seckillStock: [{ required: true, message: '请输入秒杀库存', trigger: 'blur' }],
   limitPerUser: [{ required: true, message: '请设置每人限购数量', trigger: 'blur' }],
   startTime: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
-  endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
-  status: [{ required: true, message: '请选择活动状态', trigger: 'change' }]
+  endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }]
 }
 
 const fetchList = async () => {
@@ -265,8 +273,7 @@ const handleEdit = (row) => {
     seckillStock: row.seckillStock,
     limitPerUser: row.limitPerUser,
     startTime: row.startTime,
-    endTime: row.endTime,
-    status: row.status
+    endTime: row.endTime
   })
   if (ticketOptions.value.length === 0) fetchTicketOptions()
   dialogVisible.value = true
@@ -288,11 +295,14 @@ const handleDelete = (row) => {
 }
 
 const handlePreload = async (row) => {
+  preloadingId.value = row.id
   try {
     await adminPreloadSeckillStock(row.id)
     fetchList()
   } catch (e) {
     console.error('预热失败:', e)
+  } finally {
+    preloadingId.value = null
   }
 }
 
@@ -300,7 +310,7 @@ const resetForm = () => {
   if (formRef.value) formRef.value.resetFields()
   Object.assign(formData, {
     id: null, ticketId: null, seckillPrice: 0, seckillStock: 0,
-    limitPerUser: 1, startTime: '', endTime: '', status: 0
+    limitPerUser: 1, startTime: '', endTime: ''
   })
 }
 
@@ -309,8 +319,7 @@ const submitForm = async () => {
     if (!valid) return
     formLoading.value = true
     try {
-      const payload = { ...formData }
-      delete payload.id
+      const { id, ...payload } = formData
       if (isEdit.value) {
         await adminUpdateSeckill(formData.id, payload)
       } else {
@@ -329,6 +338,11 @@ const submitForm = async () => {
 onMounted(() => {
   fetchList()
   fetchTicketOptions()
+  statusTimer = setInterval(() => { now.value = Date.now() }, 1000)
+})
+
+onUnmounted(() => {
+  if (statusTimer) { clearInterval(statusTimer); statusTimer = null }
 })
 </script>
 

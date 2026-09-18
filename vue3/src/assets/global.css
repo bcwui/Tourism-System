@@ -72,4 +72,9 @@ img {
   width: 100%;
 }
 
+/* ElMessage 消息提示下移，避免遮挡顶部标题栏 */
+.el-message {
+  top: 80px !important;
+}
+
 

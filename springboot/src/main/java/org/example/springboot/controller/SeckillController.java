@@ -57,6 +57,13 @@ public class SeckillController {
         data.put("limitPerUser", activity.getLimitPerUser());
         data.put("startTime", activity.getStartTime());
         data.put("endTime", activity.getEndTime());
+        // 返回当前用户已购数量（未登录则返回0）
+        User currentUser = JwtTokenUtils.getCurrentUser();
+        int userBought = 0;
+        if (currentUser != null) {
+            userBought = seckillService.getUserBoughtCount(activity.getId(), currentUser.getId());
+        }
+        data.put("userBoughtCount", userBought);
         return Result.success(data);
     }
 

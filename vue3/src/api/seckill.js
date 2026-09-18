@@ -10,6 +10,15 @@ export function getSeckillActivity(ticketId) {
 }
 
 /**
+ * 获取当前所有进行中的秒杀活动列表（门票列表页用）
+ */
+export function getSeckillList() {
+  return request.get('/seckill/list', {}, {
+    showDefaultMsg: false
+  })
+}
+
+/**
  * 执行秒杀
  */
 export function executeSeckill(activityId, data) {

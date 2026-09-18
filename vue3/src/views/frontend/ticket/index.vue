@@ -136,7 +136,7 @@
         </div>
 
         <!-- 门票网格 -->
-        <div v-else class="ticket-grid">
+        <div v-else ref="ticketGridRef" class="ticket-grid">
           <div
             v-for="ticket in ticketList"
             :key="ticket.id"
@@ -226,6 +226,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
+import { getSeckillList } from '@/api/seckill'
 import { Search, Refresh, Ticket, Calendar, Goods, Lightning } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -333,24 +334,20 @@ const goToBooking = (ticketId) => {
 // 获取秒杀活动列表
 const fetchSeckillList = async () => {
   try {
-    await request.get('/seckill/list', {}, {
-      showDefaultMsg: false,
-      onSuccess: (res) => {
-        const map = {}
-        let count = 0
-        if (res && Array.isArray(res)) {
-          res.forEach(item => {
-            map[item.ticketId] = {
-              activityId: item.activityId,
-              seckillPrice: item.seckillPrice
-            }
-            count++
-          })
+    const res = await getSeckillList()
+    const map = {}
+    let count = 0
+    if (res && Array.isArray(res)) {
+      res.forEach(item => {
+        map[item.ticketId] = {
+          activityId: item.activityId,
+          seckillPrice: item.seckillPrice
         }
-        seckillMap.value = map
-        activeSeckillCount.value = count
-      }
-    })
+        count++
+      })
+    }
+    seckillMap.value = map
+    activeSeckillCount.value = count
   } catch (error) {
     console.error('获取秒杀列表失败:', error)
   }
@@ -372,10 +369,11 @@ const goToSeckill = (ticketId) => {
   router.push(`/ticket/seckill/${ticketId}`)
 }
 
-// 前往秒杀专区
+const ticketGridRef = ref(null)
+
+// 前往秒杀专区 — 滚动到门票列表
 const goToSeckillZone = () => {
-  router.push('/tickets')
-  // 滚动到包含秒杀门票的位置
+  ticketGridRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // 页面加载时获取门票列表

@@ -58,6 +58,10 @@
                 </div>
               </div>
               <div v-if="countdown.status !== 'ended'" class="countdown-timer">
+                <div v-if="countdown.days > 0" class="timer-block">
+                  <span class="timer-num">{{ padZero(countdown.days) }}</span>
+                  <span class="timer-unit">天</span>
+                </div>
                 <div class="timer-block">
                   <span class="timer-num">{{ padZero(countdown.hours) }}</span>
                   <span class="timer-unit">时</span>
@@ -149,12 +153,16 @@
                 <el-form-item label="购买数量" prop="quantity">
                   <el-input-number
                     v-model="seckillForm.quantity"
-                    :min="1"
+                    :min="maxBuyQty > 0 ? 1 : 0"
                     :max="maxBuyQty"
+                    :disabled="maxBuyQty <= 0"
                     size="large"
                     class="form-input"
                   />
-                  <div class="form-tip">每人限购 {{ seckill.limitPerUser }} 张</div>
+                  <div class="form-tip">
+                    每人限购 {{ seckill.limitPerUser }} 张
+                    <span v-if="userBoughtCount > 0">（已购 {{ userBoughtCount }} 张，还可买 {{ seckill.limitPerUser - userBoughtCount }} 张）</span>
+                  </div>
                 </el-form-item>
 
                 <div class="form-row">
@@ -199,7 +207,7 @@
                   class="seckill-btn"
                   :disabled="!canSeckill"
                   :loading="submitting"
-                  @click="handleSeckill"
+                  @click="onSubmit"
                 >
                   <el-icon v-if="!submitting"><Lightning /></el-icon>
                   {{ seckillBtnText }}
@@ -238,24 +246,25 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import request from '@/utils/request'
-import { useUserStore } from '@/store/user'
+import { useSeckill } from '@/composables/useSeckill'
 import {
   Back, Edit, User, Phone, CreditCard, Goods, Lightning
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
-const userStore = useUserStore()
 
 const ticketId = computed(() => route.params.ticketId)
-const seckill = ref(null)
-const loading = ref(false)
-const submitting = ref(false)
-const successDialogVisible = ref(false)
-const currentStock = ref(0)
-const totalStock = ref(0)
+
+const {
+  seckill, loading, submitting, successDialogVisible,
+  currentStock, totalStock, userBoughtCount,
+  countdown, maxBuyQty, soldCount, progressPercent,
+  canSeckill, seckillBtnText,
+  fetchSeckillInfo, startCountdown, startStockPolling,
+  handleSeckill: doSeckill, clearTimers, reset,
+  padZero
+} = useSeckill(ticketId)
 
 const seckillFormRef = ref(null)
 const seckillForm = reactive({
@@ -285,183 +294,7 @@ const rules = {
   ]
 }
 
-const maxBuyQty = computed(() => {
-  if (!seckill.value) return 1
-  return Math.min(seckill.value.limitPerUser, currentStock.value)
-})
-
-const soldCount = computed(() => {
-  if (!totalStock.value) return 0
-  return totalStock.value - currentStock.value
-})
-
-const progressPercent = computed(() => {
-  if (!totalStock.value) return 0
-  return Math.round((soldCount.value / totalStock.value) * 100)
-})
-
-const canSeckill = computed(() => {
-  if (!seckill.value) return false
-  if (countdown.status !== 'active') return false
-  if (currentStock.value <= 0) return false
-  return true
-})
-
-const seckillBtnText = computed(() => {
-  if (!seckill.value) return '暂无秒杀'
-  if (countdown.status === 'upcoming') return '秒杀未开始'
-  if (countdown.status === 'ended') return '秒杀已结束'
-  if (currentStock.value <= 0) return '已售罄'
-  return '立即秒杀'
-})
-
-// 倒计时逻辑
-const countdown = reactive({
-  status: 'active', // upcoming | active | ended
-  days: 0,
-  hours: 0,
-  minutes: 0,
-  seconds: 0
-})
-
-let countdownTimer = null
-
-const parseTime = (str) => {
-  if (!str) return 0
-  // 后端 Jackson 返回 "yyyy-MM-dd HH:mm:ss"，替换空格为 T 确保浏览器兼容
-  return new Date(str.replace(' ', 'T')).getTime()
-}
-
-const computeCountdown = () => {
-  if (!seckill.value) return
-  const now = Date.now()
-  const startTime = parseTime(seckill.value.startTime)
-  const endTime = parseTime(seckill.value.endTime)
-
-  let diff
-  if (now < startTime) {
-    countdown.status = 'upcoming'
-    diff = startTime - now
-  } else if (now < endTime) {
-    countdown.status = 'active'
-    diff = endTime - now
-  } else {
-    countdown.status = 'ended'
-    countdown.days = 0
-    countdown.hours = 0
-    countdown.minutes = 0
-    countdown.seconds = 0
-    return
-  }
-
-  countdown.days = Math.floor(diff / 86400000)
-  countdown.hours = Math.floor((diff % 86400000) / 3600000)
-  countdown.minutes = Math.floor((diff % 3600000) / 60000)
-  countdown.seconds = Math.floor((diff % 60000) / 1000)
-}
-
-const startCountdown = () => {
-  computeCountdown()
-  countdownTimer = setInterval(() => {
-    computeCountdown()
-    if (countdown.status === 'ended') {
-      clearInterval(countdownTimer)
-      countdownTimer = null
-    }
-  }, 1000)
-}
-
-const padZero = (num) => String(num).padStart(2, '0')
-
-const fetchSeckillInfo = async () => {
-  loading.value = true
-  try {
-    await request.get(`/seckill/activity/${ticketId.value}`, {}, {
-      showDefaultMsg: false,
-      onSuccess: (res) => {
-        seckill.value = res
-        if (res) {
-          currentStock.value = res.seckillStock || 0
-          totalStock.value = res.seckillStock || 0
-          // 预填用户信息
-          if (userStore.isLoggedIn && userStore.userInfo) {
-            seckillForm.visitorName = userStore.userInfo.name || userStore.userInfo.nickname || ''
-            seckillForm.visitorPhone = userStore.userInfo.phone || ''
-          }
-          startCountdown()
-          startStockPolling()
-        }
-      }
-    })
-  } catch (error) {
-    console.error('获取秒杀信息失败:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-// 定时刷新库存
-let stockTimer = null
-const startStockPolling = () => {
-  stockTimer = setInterval(async () => {
-    if (!seckill.value) return
-    try {
-      await request.get(`/seckill/stock/${seckill.value.activityId}`, {}, {
-        showDefaultMsg: false,
-        onSuccess: (res) => {
-          currentStock.value = res || 0
-        }
-      })
-    } catch (e) { /* ignore polling errors */ }
-  }, 3000)
-}
-
-const handleSeckill = async () => {
-  if (!userStore.isLoggedIn) {
-    ElMessage.warning('请先登录')
-    router.push('/login?redirect=' + encodeURIComponent(route.fullPath))
-    return
-  }
-
-  seckillFormRef.value.validate(async (valid) => {
-    if (!valid) return
-    submitting.value = true
-    try {
-      // 将 Date 转为 yyyy-MM-dd 字符串，确保后端 LocalDate 能正确反序列化
-      const formatDate = (d) => {
-        if (!d) return null
-        const dt = new Date(d)
-        return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0')
-      }
-      await request.post(`/seckill/${seckill.value.activityId}`, {
-        activityId: seckill.value.activityId,
-        quantity: seckillForm.quantity,
-        visitorName: seckillForm.visitorName,
-        visitorPhone: seckillForm.visitorPhone,
-        idCard: seckillForm.idCard,
-        visitDate: formatDate(seckillForm.visitDate)
-      }, {
-        successMsg: '秒杀成功，订单生成中',
-        onSuccess: () => {
-          successDialogVisible.value = true
-          seckillForm.quantity = 1
-        },
-        onError: () => {
-          // 刷新库存
-          fetchSeckillInfo()
-        }
-      })
-    } catch (error) {
-      console.error('秒杀失败:', error)
-    } finally {
-      submitting.value = false
-    }
-  })
-}
-
-const disabledDate = (time) => {
-  return time.getTime() < Date.now() - 8.64e7
-}
+const disabledDate = (time) => time.getTime() < Date.now() - 8.64e7
 
 const goToTickets = () => router.push('/tickets')
 const goToOrders = () => {
@@ -469,21 +302,30 @@ const goToOrders = () => {
   router.push('/orders')
 }
 
-const clearTimers = () => {
-  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-  if (stockTimer) { clearInterval(stockTimer); stockTimer = null; }
+const onSubmit = async () => {
+  const valid = await seckillFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  await doSeckill(seckillForm)
+  seckillForm.quantity = 1
 }
 
-onMounted(() => fetchSeckillInfo())
+const initPage = async () => {
+  const prefilled = await fetchSeckillInfo()
+  if (seckill.value && prefilled) {
+    seckillForm.visitorName = prefilled.visitorName
+    seckillForm.visitorPhone = prefilled.visitorPhone
+  }
+  if (seckill.value) {
+    startCountdown()
+    startStockPolling()
+  }
+}
 
-// 监听路由参数变化，切换门票时重新加载
+onMounted(initPage)
+
 watch(ticketId, () => {
-  clearTimers()
-  seckill.value = null
-  currentStock.value = 0
-  totalStock.value = 0
-  countdown.status = 'active'
-  fetchSeckillInfo()
+  reset()
+  initPage()
 })
 
 onUnmounted(clearTimers)
